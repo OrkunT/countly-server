@@ -164,6 +164,16 @@ EOF
     message_ok "Disabled transparent hugepages"
 }
 
+# Read-ahead refers to the number of blocks the system reads in advance when it detects a sequential read operation.
+# For MongoDB, it's often recommended to lower the read-ahead setting to improve random read performance, especially when using SSDs.
+adjust_read_ahead() {
+    # Get the block device for the MongoDB data path
+    MONGODB_BLOCK_DEVICE=$(df "${MONGODB_PATH}" | tail -1 | awk '{print $1}')
+
+    # Set the read-ahead value to 16 (8KB)
+    blockdev --setra 16 "${MONGODB_BLOCK_DEVICE}"
+}
+
 function fix_mongod_service_type_and_kill_method () {
     if [[ ! $(/sbin/init --version) =~ upstart ]]; then
         SERVICE_FILE_PATH=$(systemctl status mongod | grep "loaded" | awk -F';' '{print $1}' | awk -F'(' '{print $2}')
@@ -289,6 +299,9 @@ function mongodb_check() {
 
     #Disable transparent-hugepages
     disable_transparent_hugepages
+
+    # Adjust read ahead parameter
+    adjust_read_ahead
 
     #Check if NTP is on
     if [ -f /etc/redhat-release ]; then
